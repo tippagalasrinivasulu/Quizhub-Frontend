@@ -9,11 +9,13 @@ import Result from "./pages/Result.jsx";
 import Leaderboard from "./pages/Leaderboard.jsx";
 import Analytics from "./pages/Analytics.jsx";
 import Admin from "./pages/Admin.jsx";
+import AiStudio from "./pages/AiStudio.jsx";
+import StudentAnalytics from "./pages/StudentAnalytics.jsx";
 
 function Protected({ children, admin }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" replace />;
-  if (admin && user.role !== "ADMIN") return <Navigate to="/" replace />;
+  if (admin && user.role?.toUpperCase() !== "ADMIN") return <Navigate to="/" replace />;
   return <Layout>{children}</Layout>;
 }
 
@@ -24,11 +26,13 @@ export default function App() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <AuthPage />} />
       <Route path="/" element={<Protected><Dashboard /></Protected>} />
       <Route path="/quizzes" element={<Protected><Quizzes /></Protected>} />
+      <Route path="/ai-studio" element={<Protected><AiStudio /></Protected>} />
       <Route path="/quiz/:id" element={<Protected><QuizPlay /></Protected>} />
       <Route path="/result" element={<Protected><Result /></Protected>} />
       <Route path="/leaderboard" element={<Protected><Leaderboard /></Protected>} />
       <Route path="/analytics" element={<Protected><Analytics /></Protected>} />
       <Route path="/admin" element={<Protected admin><Admin /></Protected>} />
+      <Route path="/admin/students" element={<Protected admin><StudentAnalytics /></Protected>} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

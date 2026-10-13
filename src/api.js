@@ -1,35 +1,83 @@
 import { useEffect, useState } from "react";
 
-async function request(method, path, body) {
+async function request(method, path, body, isFormData = false) {
   const token = localStorage.getItem("token");
-  const res = await fetch("/api" + path, {
-    method,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
-    body: body ? JSON.stringify(body) : undefined
-  });
-  // expired / invalid token on a protected call: send the user back to login
-  if (res.status === 401 && token && !path.startsWith("/auth")) {
+  const headers = {};
+  if (!isFormData) {
+    headers["Content-Type"] = "application/json";
+  }
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+
+  let res;
+  try {
+    res = await fetch("/api" + path, {
+      method,
+      headers,
+      body: isFormData ? body : body ? JSON.stringify(body) : undefined
+    });
+  } catch (netErr) {
+    throw new Error("Unable to reach server. Please check that Spring Boot is running on port 8080.");
+  }
+
+  // Only redirect if specifically the auth session check failed with 401
+  if (res.status === 401 && token && (path === "/auth/me" || path === "/users/profile")) {
     localStorage.clear();
     window.location.href = "/login";
+    return null;
   }
+
   const data = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(data?.message || "Something went wrong. Please try again.");
+  if (!res.ok) {
+    throw new Error(data?.message || `Request failed with status ${res.status}`);
+  }
   return data;
 }
 
 export const api = {
   get: (p) => request("GET", p),
   post: (p, b) => request("POST", p, b),
-  del: (p) => request("DELETE", p)
+  del: (p) => request("DELETE", p),
+  upload: (p, formData) => request("POST", p, formData, true)
 };
 
 export function useApi(path) {
   const [data, setData] = useState(null);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
     let alive = true;
-    api.get(path).then((d) => alive && setData(d)).catch((e) => alive && setError(e.message));
+    setLoading(true);
+    api.get(path)
+      .then((d) => {
+        if (alive) {
+          setData(d);
+          setLoading(false);
+        }
+      })
+      .catch((e) => {
+        if (alive) {
+          setError(e.message);
+          setLoading(false);
+        }
+      });
     return () => { alive = false; };
   }, [path]);
-  return { data, error };
+
+  const reload = () => {
+    setLoading(true);
+    api.get(path)
+      .then((d) => {
+        setData(d);
+        setLoading(false);
+      })
+      .catch((e) => {
+        setError(e.message);
+        setLoading(false);
+      });
+  };
+
+  return { data, error, loading, reload };
 }
